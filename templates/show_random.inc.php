@@ -42,9 +42,7 @@
                     ? 'selected="selected"' : '') . '>' .
                 $i . "</option>\n";
         }
-            echo "\t\t\t" . '<option value="-1" ' .
-                ($_POST['random'] == '-1'
-                    ? 'selected="selected"' : '') . '>' .
+            echo "\t\t\t" . '<option value="-1" selected="selected">' .
                 T_('All') . "</option>\n";
 ?>
         </select>
