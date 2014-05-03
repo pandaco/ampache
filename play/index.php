@@ -40,8 +40,9 @@ $oid            = $_REQUEST['oid']
 $sid            = scrub_in($_REQUEST['ssid']);
 $video          = make_bool($_REQUEST['video']);
 $type           = scrub_in($_REQUEST['type']);
+
 if (AmpConfig::get('transcode_player_customize')) {
-    $transcode_to   = scrub_in($_REQUEST['transcode_to']);
+    $transcode_to = scrub_in($_REQUEST['transcode_to']);
     $bitrate = intval($_REQUEST['bitrate']);
 } else {
     $transcode_to = null;
@@ -58,6 +59,8 @@ if (!$type) {
     // FIXME: Compatibility hack, should eventually be removed
     $type = 'song';
 }
+
+debug_event('play', 'Asked for type {'.$type."}", 5);
 
 if ($type == 'playlist') {
     $playlist_type = scrub_in($_REQUEST['playlist_type']);
@@ -80,7 +83,6 @@ if (empty($uid)) {
     header('HTTP/1.1 400 No User Specified');
     exit;
 }
-
 
 if (empty($share_id)) {
     $GLOBALS['user'] = new User($uid);
@@ -111,7 +113,6 @@ if (empty($share_id)) {
         // extend it
         Session::extend($sid, 'stream');
     }
-
 
     /* Update the users last seen information */
     $GLOBALS['user']->update_last_seen();
@@ -222,9 +223,9 @@ if ($media->catalog) {
 
     /* If the song is disabled */
     if (!make_bool($media->enabled)) {
-        debug_event('Play',"Error: $media->file is currently disabled, song skipped",'5');
+        debug_event('Play', "Error: $media->file is currently disabled, song skipped", '5');
         // Check to see if this is a democratic playlist, if so remove it completely
-        if ($demo_id) { $democratic->delete_from_oid($oid,'song'); }
+        if ($demo_id) { $democratic->delete_from_oid($oid, 'song'); }
         exit;
     }
 
@@ -259,7 +260,7 @@ if (!$media->file || !Core::is_readable(Core::conv_lc_file($media->file))) {
     }
     // FIXME: why are these separate?
     // Remove the song votes if this is a democratic song
-    if ($demo_id) { $democratic->delete_from_oid($oid,'song'); }
+    if ($demo_id) { $democratic->delete_from_oid($oid, 'song'); }
 
     debug_event('play', "Song $media->file ($media->title) does not have a valid filename specified", 2);
     header('HTTP/1.1 404 Invalid song, file not found or file unreadable');
@@ -272,7 +273,6 @@ ignore_user_abort(true);
 // Format the song name
 $media_name = $media->f_artist_full . " - " . $media->title . "." . $media->type;
 
-
 header('Access-Control-Allow-Origin: *');
 
 // Generate browser class for sending headers
@@ -282,7 +282,8 @@ $browser = new Horde_Browser();
  * and then present them with the download file
  */
 if ($_GET['action'] == 'download' AND AmpConfig::get('download')) {
-
+    
+    debug_event('play', 'Downloading file...', 5);
     // STUPID IE
     $media->format_pattern();
     $media_name = str_replace(array('?','/','\\'),"_",$media->f_file);
@@ -308,18 +309,6 @@ if ($_GET['action'] == 'download' AND AmpConfig::get('download')) {
         fpassthru($fp);
     }
 
-    // Make sure that a good chunk of the song has been played
-    if ($bytesStreamed >= $media->size) {
-        if ($_SERVER['REQUEST_METHOD'] != 'HEAD') {
-            debug_event('Play', 'Downloaded, Registering stats for ' . $media->title, '5');
-            $sessionkey = Stream::$session;
-            //debug_event('play', 'Current session key {'.$sessionkey.'}', '5');
-            $agent = Session::agent($sessionkey);
-            //debug_event('play', 'Current session agent {'.$agent.'}', '5');
-            $GLOBALS['user']->update_stats($media->id, $agent);
-        }
-    } // if enough bytes are streamed
-
     fclose($fp);
     exit();
 
@@ -341,11 +330,18 @@ if (AmpConfig::get('downsample_remote')) {
     }
 }
 
+debug_event('play', 'Playing file ('.$media->file.'}...', 5);
+debug_event('play', 'Media type {'.$media->type.'}', 5);
+
 $cpaction = $_REQUEST['custom_play_action'];
 // Determine whether to transcode
 $transcode = false;
 // transcode_to should only have an effect if the song is the wrong format
 $transcode_to = $transcode_to == $media->type ? null : $transcode_to;
+
+debug_event('play', 'Custom play action {'.$cpaction.'}', 5);
+debug_event('play', 'Transcode to {'.$transcode_to.'}', 5);
+
 // If custom play action, do not try to transcode
 if (!$cpaction) {
     $transcode_cfg = AmpConfig::get('transcode');
@@ -366,8 +362,10 @@ if (!$cpaction) {
         } else {
             debug_event('play', 'Decided not to transcode', 5);
         }
-    } else if ($transcode_to) {
-        debug_event('play', 'Transcoding is impossible but we received an explicit request for ' . $transcode_to, 2);
+    } else if ($transcode_cfg != 'never') {
+        debug_event('play', 'Transcoding is not enabled for this media type. Valid types: {'.json_encode($valid_types).'}', 5);
+    } else {
+        debug_event('play', 'Transcode disabled in user settings.', 5);
     }
 }
 
@@ -379,9 +377,6 @@ if ($transcode) {
     $transcoder = $media->run_custom_play_action($cpaction, $transcode_to);
     $fp = $transcoder['handle'];
     $transcode = true;
-} else if (!in_array('native', $valid_types)) {
-    debug_event('play', 'Not transcoding and native streaming is not supported, aborting', 2);
-    exit();
 } else {
     $fp = fopen(Core::conv_lc_file($media->file), 'rb');
 }

@@ -72,6 +72,7 @@ class WebPlayer
         }
 
         if (!empty($force_type)) {
+            debug_event("webplayer.class.php", "Forcing type to {".$force_type."}", 5);
             $types['real'] = $force_type;
         } else {
             if ($browser == "msie" || $browser == "trident" || $browser == "webkit" || $browser == "safari") {
@@ -112,7 +113,6 @@ class WebPlayer
                             }
                         }
                     }
-
                 }
             }
 
@@ -138,6 +138,7 @@ class WebPlayer
 
         if (empty($types['player'])) $types['player'] = $types['real'];
 
+        debug_event("webplayer.class.php", "Types {".json_encode($types)."}", 5);
         return $types;
     }
 
@@ -187,8 +188,11 @@ class WebPlayer
         $url = $item->url;
 
         $types = self::get_types($item, $force_type);
+
         $song = null;
         $urlinfo = Stream_URL::parse($url);
+        $url = $urlinfo['base_url'];
+
         if ($urlinfo['id'] && $urlinfo['type'] == 'song') {
             $song = new Song($urlinfo['id']);
         } else if ($urlinfo['id'] && $urlinfo['type'] == 'song_preview') {
@@ -212,6 +216,8 @@ class WebPlayer
             $js['poster'] = $item->image_url . (!$iframed ? '&thumb=4' : '');
         }
 
+        debug_event("webplayer.class.php", "Return get_media_js_param {".json_encode($js)."}", 5);
+        
         return json_encode($js);
     }
 }

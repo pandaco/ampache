@@ -52,6 +52,8 @@ class Stream_URL extends memory_object
         $elements = explode('&', $query);
         $results = array();
 
+        $results['base_url'] = $url;
+
         foreach ($elements as $element) {
             list($key, $value) = explode('=', $element);
             switch ($key) {
@@ -68,7 +70,6 @@ class Stream_URL extends memory_object
             }
             $results[$key] = $value;
         }
-
         return $results;
     }
 
