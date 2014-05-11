@@ -622,7 +622,7 @@ class vainfo
             switch ($tag) {
                 case 'genre':
                     // Pass the array through
-                    $parsed[$tag] = $data;
+                    $parsed['genre'] = $data;
                 break;
                 case 'part_of_a_set':
                     $elements = explode('/', $data[0]);
@@ -662,6 +662,34 @@ class vainfo
                         $parsed['mb_artistid'] = $txxx['data'];
                     break;
                 }
+            }
+        }
+
+        // Find all genre
+        if (!empty($id3v2['TCON'])) {
+            // Find the MBID for the track
+            foreach ($id3v2['TCON'] as $tcid) {
+                if ($tcid['framenameshort'] == "genre") {
+                    // Removing unwanted UTF-8 charaters
+                    $tcid['data'] = str_replace("\xFF", "", $tcid['data']);
+                    $tcid['data'] = str_replace("\xFE", "", $tcid['data']);
+
+                    if (!empty($tcid['data'])) {
+                        // Parsing string with the null character
+                        $genres = explode("\0", $tcid['data']);
+                        $parsed_genres = array();
+                        foreach ($genres as $g) {
+                            if (strlen($g) > 2) {   // Only allow tags with at least 3 characters
+                                $parsed_genres[] = $g;
+                            }
+                        }
+
+                        if (count($parsed_genres)) {
+                            $parsed['genre'] = $parsed_genres;
+                        }
+                    }
+                }
+                break;
             }
         }
 
